@@ -8,6 +8,9 @@ import torch
 import uuid
 import os
 
+import chromadb
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -34,18 +37,23 @@ pipe = StableDiffusionPipeline.from_pretrained(
 
 pipe = pipe.to(device)
 
-chat_context: List[str] = []
 MAX_CONTEXT = 5
+client = chromadb.Client()
+embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+collection = client.get_or_create_collection(name="dream_to_design_chat_context", embedding_function=embedding_fn)
 
 @app.post("/generate-image")
 
 async def generate_image(request: PromptRequest):
-  global chat_context
+  collection.add(documents=[request.prompt], ids=[str(uuid.uuid4())])
 
-  chat_context.append(request.prompt)
-  chat_context = chat_context[-MAX_CONTEXT:]
+  results = collection.query(
+    query_texts=[request.prompt],
+    n_results=MAX_CONTEXT
+  )
 
-  full_prompt = " ".join(chat_context)
+  recent_prompts = results["documents"][0] if results["documents"] else []
+  full_prompt = " ".join(recent_prompts)
 
   image = pipe(full_prompt).images[0]
 
@@ -57,10 +65,11 @@ async def generate_image(request: PromptRequest):
   return {
     "url": f"http://localhost:8000/{image_path}",
     "context_used": full_prompt,
-    "recent_prompts": chat_context,
+    "recent_prompts": recent_prompts,
   }
 
 @app.post("/clear-context")
 async def clear_context():
-  chat_context.clear()
+  client.delete_collection("dream_to_design_chat_context")
+  client.get_or_create_collection(name="dream_to_design_chat_context", embedding_function=embedding_fn)
   return {"message": "Chat context cleared"}
