@@ -1,17 +1,27 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Box, TextField, Button } from "@mui/material";
+import { Box, TextField, Button, Snackbar, Alert } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
+import DeleteIcon from "@mui/icons-material/Delete";
 import "./App.css";
 
 function App() {
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [severity, setSeverity] = useState("success");
+  const [open, setOpen] = React.useState(false);
+
+  const handleClose = (_, reason) => {
+    if (reason === "clickaway") return;
+    setOpen(false);
+  };
 
   const generateImage = async () => {
     setLoading(true);
     setImageUrl("");
+    setMessage("");
 
     try {
       const res = await axios.post("http://localhost:8000/generate-image", {
@@ -20,16 +30,51 @@ function App() {
 
       const imageUrlFromBackend = res.data.url;
       setImageUrl(imageUrlFromBackend);
+      setSeverity("success");
+      setMessage("Image generated successfully!");
+      setOpen(true);
     } catch (err) {
       console.error("Error generating image:", err);
+      setSeverity("error");
+      setMessage("Failed to generate image.");
+      setOpen(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const clearContext = async () => {
+    try {
+      const res = await axios.post("http://localhost:8000/clear-context");
+      setSeverity("success");
+      setMessage(res.data.message || "Context cleared!");
+      setOpen(true);
+    } catch (err) {
+      console.error("Error clearing context:", err);
+      setSeverity("error");
+      setMessage("Failed to clear context.");
+      setOpen(true);
     }
   };
 
   return (
     <div className="App">
       <Box sx={{ width: "50%" }}>
+        <Snackbar
+          open={open}
+          autoHideDuration={4000}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            onClose={handleClose}
+            severity={severity}
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {message}
+          </Alert>
+        </Snackbar>
         <div className="">
           <h1 style={{ color: "white" }}>Dream-to-Design Generator</h1>
           <TextField
@@ -56,23 +101,37 @@ function App() {
           <Box
             sx={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
               marginTop: "10px",
             }}
           >
             <Button
-              variant="contained"
+              variant="outlined"
+              endIcon={<DeleteIcon />}
+              onClick={clearContext}
+              sx={{
+                borderColor: "white",
+                color: "white",
+                "&:hover": {
+                  borderColor: "#f00",
+                  color: "#f00",
+                },
+              }}
+            >
+              Clear Context
+            </Button>
+
+            <Button
+              variant="outlined"
               endIcon={<SendIcon />}
               onClick={generateImage}
               disabled={!prompt || loading}
-              loading={loading}
-              loadingPosition="end"
               sx={{
-                backgroundColor: "blue",
+                borderColor: "blue",
                 color: "white",
                 "&.Mui-disabled": {
-                  backgroundColor: "#4d4df0",
-                  color: "white",
+                  borderColor: "#4d4df0",
+                  color: "#4d4df0",
                 },
               }}
             >
