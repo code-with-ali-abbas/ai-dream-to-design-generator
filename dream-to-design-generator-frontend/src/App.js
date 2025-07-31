@@ -1,17 +1,18 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Box, TextField, Button, Snackbar, Alert } from "@mui/material";
+import { v4 as uuidv4 } from "uuid";
+import { Box, TextField, Button, Snackbar, Alert, Skeleton } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import DeleteIcon from "@mui/icons-material/Delete";
 import "./App.css";
 
 function App() {
   const [prompt, setPrompt] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [severity, setSeverity] = useState("success");
   const [open, setOpen] = React.useState(false);
+  const [generatedResponses, setGeneratedResponses] = useState([]);
 
   const handleClose = (_, reason) => {
     if (reason === "clickaway") return;
@@ -19,8 +20,13 @@ function App() {
   };
 
   const generateImage = async () => {
+    if (!prompt) return;
+
+    const itemId = uuidv4();
+    const newItem = { id: itemId, prompt, imageUrl: null };
+    setGeneratedResponses((prev) => [newItem, ...prev]);
+
     setLoading(true);
-    setImageUrl("");
     setMessage("");
 
     try {
@@ -29,7 +35,11 @@ function App() {
       });
 
       const imageUrlFromBackend = res.data.url;
-      setImageUrl(imageUrlFromBackend);
+      setGeneratedResponses((prev) =>
+        prev.map((item) =>
+          item.id === itemId ? { ...item, imageUrl: imageUrlFromBackend } : item
+        )
+      );
       setSeverity("success");
       setMessage("Image generated successfully!");
       setOpen(true);
@@ -40,6 +50,7 @@ function App() {
       setOpen(true);
     } finally {
       setLoading(false);
+      setPrompt("");
     }
   };
 
@@ -139,14 +150,45 @@ function App() {
             </Button>
           </Box>
 
-          {imageUrl && (
-            <div>
-              <h2 style={{ color: "white" }}>
-                Here are the visuals of your dream
-              </h2>
-              <img src={imageUrl} alt="Generated" />
-            </div>
-          )}
+          <div style={{ marginTop: "30px" }}>
+            {generatedResponses.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  backgroundColor: "#282c34",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  marginBottom: "20px",
+                }}
+              >
+                <p
+                  style={{
+                    color: "#ccc",
+                    fontWeight: "bold",
+                    marginBottom: "12px",
+                    textAlign: "left"
+                  }}
+                >
+                  {item.prompt}
+                </p>
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt="Generated"
+                    style={{ width: "100%", borderRadius: "8px" }}
+                  />
+                ) : (
+                  <Skeleton
+                    variant="rectangular"
+                    width="100%"
+                    height={300}
+                    animation="wave"
+                    sx={{ borderRadius: "8px", bgcolor: 'grey.800' }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </Box>
     </div>
